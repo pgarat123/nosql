@@ -14,6 +14,7 @@ def get_year_with_most_films(collection):
         dict: {'year': int, 'count': int}
     """
     pipeline = [
+        {"$match": {"year": {"$exists": True, "$ne": None}}},
         {"$group": {"_id": "$year", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
         {"$limit": 1}
@@ -70,6 +71,7 @@ def get_films_per_year(collection):
         list: Liste de dicts {'year': int, 'count': int} triée par année
     """
     pipeline = [
+        {"$match": {"year": {"$exists": True, "$ne": None}}},
         {"$group": {"_id": "$year", "count": {"$sum": 1}}},
         {"$sort": {"_id": 1}}
     ]
@@ -335,7 +337,7 @@ def get_average_runtime_by_decade(collection):
         list: Liste de dicts {'decade': str, 'avg_runtime': float}
     """
     pipeline = [
-        {"$match": {"Runtime (Minutes)": {"$exists": True, "$ne": None}}},
+        {"$match": {"year": {"$exists": True, "$ne": None}}},
         {"$addFields": {"decade": {"$floor": {"$divide": ["$year", 10]}}}},
         {"$group": {
             "_id": "$decade",
