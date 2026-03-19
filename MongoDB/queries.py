@@ -118,23 +118,30 @@ def get_film_with_highest_revenue(collection):
 
 
 def get_directors_with_more_than_n_films(collection, n=5):
-    """
-    Récupère les réalisateurs ayant réalisé plus de n films.
-    
-    Args:
-        collection: Collection MongoDB des films
-        n: Seuil minimum de films (défaut: 5)
-        
-    Returns:
-        list: Liste de dicts {'director': str, 'film_count': int}
-    """
-    pipeline = [
-        {"$group": {"_id": "$Director", "film_count": {"$sum": 1}}},
-        {"$match": {"film_count": {"$gt": n}}},
-        {"$sort": {"film_count": -1}},
-        {"$project": {"director": "$_id", "film_count": 1, "_id": 0}}
+    # 1. On récupère tous les réalisateurs
+    docs = list(collection.find(
+        {"Director": {"$exists": True, "$ne": None, "$ne": ""}},
+        {"_id": 0, "Director": 1}
+    ))
+
+    # 2. Comptage en Python
+    counts = {}
+    for doc in docs:
+        director = str(doc.get("Director")).strip()
+        if director:
+            counts[director] = counts.get(director, 0) + 1
+
+    # 3. Filtrage
+    result = [
+        {"director": director, "film_count": count}
+        for director, count in counts.items()
+        if count >= n
     ]
-    return list(collection.aggregate(pipeline))
+
+    # 4. Tri (du plus grand au plus petit)
+    result.sort(key=lambda x: (-x["film_count"], x["director"]))
+
+    return result
 
 
 def get_genre_with_highest_average_revenue(collection):
@@ -160,35 +167,48 @@ def get_genre_with_highest_average_revenue(collection):
 
 
 def get_top_3_films_per_decade(collection):
-    """
-    Récupère les 3 films les mieux notés (rating) pour chaque décennie.
-    
-    Args:
-        collection: Collection MongoDB des films
-        
-    Returns:
-        dict: {decade_range: [film1, film2, film3], ...}
-    """
-    pipeline = [
-        {"$match": {"rating": {"$exists": True, "$ne": None}}},
-        {"$addFields": {"decade": {"$floor": {"$divide": ["$year", 10]}}}},
-        {"$sort": {"decade": 1, "rating": -1}},
-        {"$group": {
-            "_id": "$decade",
-            "films": {"$push": {"title": "$title", "rating": "$rating", "year": "$year"}}
-        }},
-        {"$sort": {"_id": 1}}
-    ]
-    
-    result = list(collection.aggregate(pipeline))
-    output = {}
-    for doc in result:
-        decade_start = int(doc["_id"] * 10)
-        decade_end = decade_start + 9
-        decade_range = f"{decade_start}-{decade_end}"
-        output[decade_range] = doc["films"][:3]
-    
-    return output
+    docs = list(collection.find(
+        {
+            "Metascore": {"$exists": True, "$ne": None},
+            "year": {"$exists": True, "$ne": None}
+        },
+        {
+            "_id": 0,
+            "title": 1,
+            "Metascore": 1,
+            "year": 1
+        }
+    ))
+
+    cleaned = []
+
+    for doc in docs:
+        try:
+            year_value = int(doc["year"])
+            metascore_value = float(doc["Metascore"])
+            cleaned.append({
+                "title": doc.get("title", "Unknown"),
+                "score": metascore_value,
+                "year": year_value,
+                "decade": (year_value // 10) * 10
+            })
+        except (TypeError, ValueError, KeyError):
+            continue
+
+    cleaned.sort(key=lambda x: (x["decade"], -x["score"], x["title"]))
+
+    result = {}
+    for film in cleaned:
+        label = f"{film['decade']}-{film['decade'] + 9}"
+        result.setdefault(label, [])
+        if len(result[label]) < 3:
+            result[label].append({
+                "title": film["title"],
+                "metascore": film["score"],
+                "year": film["year"]
+            })
+
+    return result
 
 
 def get_longest_film_per_genre(collection):

@@ -1,2 +1,3 @@
 # ignore environment variables (usernames / passwords)
 .env
+cred.txt
