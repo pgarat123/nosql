@@ -18,12 +18,50 @@ function App() {
       const data = await response.json()
 
       console.log("API RESPONSE:", data)
-      setResult(JSON.stringify(data, null, 2))
+      setResult(data) // Store as object instead of string
     } catch (error) {
-      setResult(`Erreur lors de l'appel au backend : ${error.message}`)
+      setResult({ error: `Erreur lors de l'appel au backend : ${error.message}` })
     } finally {
       setLoading(false)
     }
+  }
+
+  const renderResult = () => {
+    if (!result) return null;
+    if (typeof result === 'string') return <pre className="whitespace-pre-wrap break-words text-xs font-mono">{result}</pre>;
+    
+    // Si c'est l'histogramme, on affiche un graphique
+    if (title === 'Histogram data' && Array.isArray(result)) {
+      const maxCount = Math.max(...result.map(d => d.count))
+      return (
+        <div className="space-y-4 pt-4">
+          <div className="flex items-end h-48 gap-1 border-b border-l border-white/20 pb-1 pl-1">
+            {result.map((d, i) => (
+              <div 
+                key={i} 
+                className="bg-green-500 hover:bg-green-400 transition-all group relative flex-1"
+                style={{ height: `${(d.count / maxCount) * 100}%` }}
+              >
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-700 text-[10px] p-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-20">
+                  {d.year}: {d.count}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-[10px] text-gray-500 px-1">
+            <span>{result[0]?.year}</span>
+            <span>Années</span>
+            <span>{result[result.length - 1]?.year}</span>
+          </div>
+          <details className="mt-4">
+            <summary className="text-xs text-gray-400 cursor-pointer">Voir JSON brut</summary>
+            <pre className="text-[10px] mt-2 bg-black/20 p-2 rounded">{JSON.stringify(result, null, 2)}</pre>
+          </details>
+        </div>
+      )
+    }
+
+    return <pre className="whitespace-pre-wrap break-words text-xs font-mono">{JSON.stringify(result, null, 2)}</pre>
   }
 
   return (
@@ -153,11 +191,7 @@ function App() {
               <div className="bg-black/40 rounded-lg p-4 max-h-[70vh] overflow-auto border border-white/10">
                 {loading ? (
                   <p className="text-gray-400 animate-pulse">Chargement des données...</p>
-                ) : (
-                  <pre className="whitespace-pre-wrap break-words text-xs font-mono">
-                    {result}
-                  </pre>
-                )}
+                ) : renderResult()}
               </div>
             </div>
           </div>
